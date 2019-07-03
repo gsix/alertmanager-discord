@@ -3,28 +3,28 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
-type alertManAlert struct {
-	Annotations struct {
-		Description string `json:"description"`
-		Summary     string `json:"summary"`
-	} `json:"annotations"`
-	EndsAt       string            `json:"endsAt"`
-	GeneratorURL string            `json:"generatorURL"`
-	Labels       map[string]string `json:"labels"`
-	StartsAt     string            `json:"startsAt"`
-	Status       string            `json:"status"`
-}
-
 type alertManOut struct {
-	Alerts            []alertManAlert `json:"alerts"`
+	Alerts []struct {
+		Annotations struct {
+			Description string `json:"description"`
+			Summary     string `json:"summary"`
+		} `json:"annotations"`
+		EndsAt       string            `json:"endsAt"`
+		GeneratorURL string            `json:"generatorURL"`
+		Labels       map[string]string `json:"labels"`
+		StartsAt     string            `json:"startsAt"`
+		Status       string            `json:"status"`
+	} `json:"alerts"`
 	CommonAnnotations struct {
 		Summary string `json:"summary"`
 	} `json:"commonAnnotations"`
@@ -46,16 +46,37 @@ type discordOut struct {
 	Name    string `json:"username"`
 }
 
-func main() {
-	webhookUrl := os.Getenv("DISCORD_WEBHOOK")
-	whURL := flag.String("webhook.url", webhookUrl, "")
-	flag.Parse()
+type wHooks struct {
+	Hooks []struct {
+		Project string `yaml:"project"`
+		Hook    string `yaml:"hook"`
+	} `yaml:"hooks"`
+}
 
-	if webhookUrl == "" && *whURL == "" {
-		fmt.Fprintf(os.Stderr, "error: environment variable DISCORD_WEBHOOK not found\n")
-		os.Exit(1)
+func findWHook(project string) string {
+	var hooks wHooks
+	data, err := ioutil.ReadFile("./webhooks.yml")
+
+	if err != nil {
+		fmt.Println(err)
 	}
 
+	err = yaml.Unmarshal(data, &hooks)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+	result := ""
+
+	for _, hook := range hooks.Hooks {
+		if hook.Project == project {
+			result = hook.Hook
+		}
+	}
+	return result
+}
+
+func main() {
 	fmt.Fprintf(os.Stdout, "info: Listening on 0.0.0.0:9094\n")
 	http.ListenAndServe(":9094", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, err := ioutil.ReadAll(r.Body)
@@ -69,34 +90,35 @@ func main() {
 			panic(err)
 		}
 
-		groupedAlerts := make(map[string][]alertManAlert)
-
-		for _, alert := range amo.Alerts {
-			groupedAlerts[alert.Status] = append(groupedAlerts[alert.Status], alert)
+		emoji := "bell"
+		// Let's have a nice emoji
+		if strings.ToUpper(amo.Status) == "FIRING" {
+			emoji = ":airplane_arriving: :fire:"
+		} else {
+			emoji = ":wine_glass: :cheese:"
 		}
 
-		for status, alerts := range groupedAlerts {
+		for _, alert := range amo.Alerts {
 			DO := discordOut{
-				Name: status,
+				Name: amo.Status,
 			}
-
 			Content := "```"
-			if amo.CommonAnnotations.Summary != "" {
-				Content = fmt.Sprintf(" === %s === \n```", amo.CommonAnnotations.Summary)
+			if alert.Annotations.Summary != "" {
+				Content = fmt.Sprintf("%s %s\n```\n", emoji, alert.Annotations.Summary)
 			}
 
-			for _, alert := range alerts {
+			for _, alert := range amo.Alerts {
 				realname := alert.Labels["instance"]
 				if strings.Contains(realname, "localhost") && alert.Labels["exported_instance"] != "" {
 					realname = alert.Labels["exported_instance"]
 				}
-				Content += fmt.Sprintf("[%s]: %s on %s\n%s\n\n", strings.ToUpper(status), alert.Labels["alertname"], realname, alert.Annotations.Description)
+				Content += fmt.Sprintf("[%s]: %s on %s\n%s\n\n", strings.ToUpper(amo.Status), alert.Labels["alertname"], realname, alert.Annotations.Description)
 			}
-
 			DO.Content = Content + "```"
 
+			whURL := findWHook(alert.Labels["project"])
 			DOD, _ := json.Marshal(DO)
-			http.Post(*whURL, "application/json", bytes.NewReader(DOD))
+			http.Post(whURL, "application/json", bytes.NewReader(DOD))
 		}
 	}))
 }
