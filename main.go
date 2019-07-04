@@ -55,7 +55,7 @@ type wHooks struct {
 
 func findWHook(project string) string {
 	var hooks wHooks
-	data, err := ioutil.ReadFile("/alertdiscord/webhooks.yml")
+	data, err := ioutil.ReadFile("/home/appuser/webhooks.yml")
 
 	if err != nil {
 		fmt.Println(err)

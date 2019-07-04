@@ -22,11 +22,11 @@ COPY --from=builder /etc/passwd /etc/passwd
 # Copy our static executable
 COPY --from=builder /go/bin/alertmanager-discord /go/bin/alertmanager-discord
 
-RUN mkdir -p /alertdiscord && chown -R nobody:nogroup /alertdiscord
+RUN mkdir -p /home/appuser && chown -R appuser:appuser /home/appuser
 
-USER nobody
+USER appuser
 EXPOSE 9094
-VOLUME     [ "/alertdiscord" ]
-WORKDIR    /alertdiscord
+VOLUME     [ "/home/appuser" ]
+WORKDIR    /home/appuser
 ENTRYPOINT ["/go/bin/alertmanager-discord"]
 
