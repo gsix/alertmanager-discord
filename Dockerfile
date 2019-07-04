@@ -22,8 +22,6 @@ COPY --from=builder /etc/passwd /etc/passwd
 # Copy our static executable
 COPY --from=builder /go/bin/alertmanager-discord /go/bin/alertmanager-discord
 
-RUN mkdir -p /home/appuser && chown -R appuser:appuser /home/appuser
-
 USER appuser
 EXPOSE 9094
 VOLUME     [ "/home/appuser" ]
