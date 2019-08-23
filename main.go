@@ -49,31 +49,36 @@ type discordOut struct {
 type wHooks struct {
 	Hooks []struct {
 		Project string `yaml:"project"`
-		Hook    string `yaml:"hook"`
+		Env     []struct {
+			Name string `yaml:"name"`
+			Hook string `yaml:"hook"`
+		} `yaml:"env"`
 	} `yaml:"hooks"`
 }
 
-func findWHook(project string) string {
-	var hooks wHooks
+func findWHook(projectName, projectEnv string) string {
+	var configs wHooks
 	data, err := ioutil.ReadFile("/home/appuser/webhooks.yml")
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	err = yaml.Unmarshal(data, &hooks)
+	err = yaml.Unmarshal(data, &configs)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
-	result := ""
-
-	for _, hook := range hooks.Hooks {
-		if hook.Project == project {
-			result = hook.Hook
+	for _, config := range configs.Hooks {
+		if config.Project == projectName {
+			for _, env := range config.Env {
+				if env.Name == projectEnv {
+					return env.Hook
+				}
+			}
 		}
 	}
-	return result
+	return ""
 }
 
 func main() {
@@ -116,7 +121,7 @@ func main() {
 			}
 			DO.Content = Content + "```"
 
-			whURL := findWHook(alert.Labels["project"])
+			whURL := findWHook(alert.Labels["project"], alert.Labels["env"])
 			DOD, _ := json.Marshal(DO)
 			http.Post(whURL, "application/json", bytes.NewReader(DOD))
 		}

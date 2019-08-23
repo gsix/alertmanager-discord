@@ -1,0 +1,14 @@
+# webhooks config example
+hooks:
+  - project: website
+    env:
+      - name: stage
+        hook: http://websitestage
+      - name: production
+        hook: http://websiteprod
+  - project: awesomeProject
+    env:
+      - name: stage
+        hook: http://awesome-project-stage
+      - name: production
+        hook: http://awesome-project-prod
