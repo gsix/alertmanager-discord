@@ -16,13 +16,15 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflag
 
 # STEP 2 build a small image
 # start from scratch
-FROM scratch
+FROM alpine
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /etc/passwd /etc/passwd
 # Copy our static executable
 COPY --from=builder /go/bin/alertmanager-discord /go/bin/alertmanager-discord
 
-EXPOSE 9094
 USER appuser
+EXPOSE 9094
+VOLUME     [ "/home/appuser" ]
+WORKDIR    /home/appuser
 ENTRYPOINT ["/go/bin/alertmanager-discord"]
 
